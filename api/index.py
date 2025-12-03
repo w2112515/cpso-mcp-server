@@ -16,6 +16,7 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
+from starlette.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
@@ -133,10 +134,32 @@ async def handle_sse(request):
         )
 
 
+async def health_check(request):
+    """健康检查"""
+    return JSONResponse({
+        "status": "healthy",
+        "service": "cpso-mcp-server",
+        "version": "1.0.0"
+    })
+
+
+async def homepage(request):
+    """根路径"""
+    return JSONResponse({
+        "name": "CPSO MCP Server",
+        "version": "1.0.0",
+        "status": "running",
+        "sse_endpoint": "/sse",
+        "message_endpoint": "/messages/"
+    })
+
+
 # 创建 Starlette 应用
 app = Starlette(
     debug=True,
     routes=[
+        Route("/", endpoint=homepage),
+        Route("/health", endpoint=health_check),
         Route("/sse", endpoint=handle_sse),
         Mount("/messages/", app=sse.handle_post_message),
     ],
@@ -146,6 +169,7 @@ app = Starlette(
             allow_origins=["*"],
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["*"],
         )
     ],
 )
