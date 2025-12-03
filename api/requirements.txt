@@ -9,11 +9,13 @@ uvicorn[standard]>=0.20.0
 
 # 核心依赖
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
 httpx>=0.24.0
+python-dotenv>=1.0.0
 
-# 如果需要完整 CPSO 功能，取消下面的注释
-# langgraph>=0.0.39
-# langchain>=0.1.0
-# langchain-anthropic>=0.1.0
-# chromadb>=0.4.0
-# redis>=4.5.0
+# CPSO 完整功能
+langgraph>=0.0.39
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-core>=0.1.0
