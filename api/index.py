@@ -5,6 +5,11 @@ Vercel Serverless Function for CPSO MCP Server
 
 import sys
 import os
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 添加项目根目录到路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,14 +26,54 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 import json
 
+# ============================================
+# 启动时检查环境变量配置
+# ============================================
+def check_api_keys():
+    """检查 API Key 配置状态"""
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    if not anthropic_key and not openai_key:
+        logger.error("⚠️ 警告: 未配置 ANTHROPIC_API_KEY 或 OPENAI_API_KEY!")
+        logger.error("⚠️ LLM 功能将无法正常工作，请在 Render Dashboard 中配置环境变量")
+        return False
+
+    if anthropic_key:
+        logger.info("✅ 已配置 ANTHROPIC_API_KEY")
+    if openai_key:
+        logger.info("✅ 已配置 OPENAI_API_KEY (DeepSeek 模式)")
+
+    return True
+
+API_KEYS_CONFIGURED = check_api_keys()
+
 
 def execute_strategy_impl(user_intent: str) -> list[TextContent]:
     """执行战略规划"""
+    # 首先检查 API Key 是否配置
+    if not API_KEYS_CONFIGURED:
+        error_text = """## ❌ 配置错误
+
+**服务未正确配置 LLM API Key**
+
+请在 Render Dashboard 中配置以下环境变量之一：
+- `ANTHROPIC_API_KEY`: Anthropic Claude API 密钥
+- `OPENAI_API_KEY`: OpenAI/DeepSeek API 密钥
+
+配置完成后，服务将自动重新部署。
+
+---
+*错误代码: API_KEY_NOT_CONFIGURED*
+"""
+        logger.error("execute_strategy called but API keys not configured")
+        return [TextContent(type="text", text=error_text)]
+
     try:
         from cpsp_protocol.graph import create_graph
         from cpsp_protocol.state.schema import GlobalState, GlobalStateStatus
         import uuid
-        
+
         state = GlobalState(
             request_id=str(uuid.uuid4()),
             status=GlobalStateStatus.SCOUTING,
@@ -43,10 +88,10 @@ def execute_strategy_impl(user_intent: str) -> list[TextContent]:
             audit_report="",
             input_attachments=[]
         )
-        
+
         graph = create_graph()
         result_state = graph.invoke(state)
-        
+
         result_text = f"""## 战略草案
 
 {result_state["strategy_draft"]}
@@ -59,28 +104,23 @@ def execute_strategy_impl(user_intent: str) -> list[TextContent]:
 请求 ID: {result_state["request_id"]}
 """
     except Exception as e:
-        print(f"CPSO execution error: {str(e)}")
-        result_text = f"""## 战略分析结果
+        logger.error(f"CPSO execution error: {str(e)}", exc_info=True)
+        result_text = f"""## ❌ 执行错误
 
-针对您的需求："{user_intent}"
+执行战略规划时遇到错误：
+```
+{str(e)}
+```
 
-### 1. 市场分析
-- 目标市场规模和增长趋势
-- 主要竞争对手分析
-- 市场机会与威胁
+**可能的原因**：
+1. LLM API Key 无效或已过期
+2. API 服务暂时不可用
+3. 请求超时
 
-### 2. 战略建议
-- 短期目标（1-3个月）
-- 中期目标（3-12个月）
-- 长期目标（1-3年）
-
-### 3. 实施路径
-1. 第一阶段：市场调研与验证
-2. 第二阶段：产品/服务开发
-3. 第三阶段：市场推广与扩展
+请检查 Render 日志获取更多信息。
 
 ---
-*注意：当前为演示输出。完整 CPSO 系统需要配置环境变量*
+*用户意图: {user_intent}*
 """
     return [TextContent(type="text", text=result_text)]
 
@@ -409,10 +449,19 @@ async def handle_sse(request):
 
 async def health_check(request):
     """健康检查"""
+    anthropic_configured = bool(os.getenv("ANTHROPIC_API_KEY"))
+    openai_configured = bool(os.getenv("OPENAI_API_KEY"))
+
     return JSONResponse({
-        "status": "healthy",
+        "status": "healthy" if API_KEYS_CONFIGURED else "degraded",
         "service": "cpso-mcp-server",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "config": {
+            "anthropic_api_key": "configured" if anthropic_configured else "missing",
+            "openai_api_key": "configured" if openai_configured else "missing",
+            "llm_ready": API_KEYS_CONFIGURED
+        },
+        "message": "LLM功能正常" if API_KEYS_CONFIGURED else "警告: 未配置API Key，LLM功能不可用"
     })
 
 
