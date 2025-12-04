@@ -7,3 +7,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      # 添加环境变量说明，提醒用户在 Render 控制台中设置这些变量
+      # 必需的变量之一:
+      # - key: ANTHROPIC_API_KEY
+      #   value: sk-ant-...  # 你的 Anthropic API 密钥
+      # 或者:
+      # - key: OPENAI_API_KEY
+      #   value: sk-...  # 你的 OpenAI/DeepSeek API 密钥
