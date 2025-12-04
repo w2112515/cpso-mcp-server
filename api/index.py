@@ -13,12 +13,13 @@ if project_root not in sys.path:
 
 from mcp.server.sse import SseServerTransport
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, EmbeddedResource
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
+import json
 
 
 def execute_strategy_impl(user_intent: str) -> list[TextContent]:
@@ -48,14 +49,14 @@ def execute_strategy_impl(user_intent: str) -> list[TextContent]:
         
         result_text = f"""## 战略草案
 
-{result_state.strategy_draft}
+{result_state["strategy_draft"]}
 
 ## 审计报告
 
-{result_state.audit_report}
+{result_state["audit_report"]}
 
 ---
-请求 ID: {result_state.request_id}
+请求 ID: {result_state["request_id"]}
 """
     except Exception as e:
         print(f"CPSO execution error: {str(e)}")
@@ -84,6 +85,176 @@ def execute_strategy_impl(user_intent: str) -> list[TextContent]:
     return [TextContent(type="text", text=result_text)]
 
 
+def analyze_intent_impl(user_intent: str) -> list[TextContent]:
+    """分析用户战略意图并生成侦察指令"""
+    try:
+        from cpsp_protocol.nodes.cpso import intent_analysis
+        from cpsp_protocol.state.schema import GlobalState, GlobalStateStatus
+        import uuid
+        
+        # Initialize the state with user intent
+        state = GlobalState(
+            request_id=str(uuid.uuid4()),
+            status=GlobalStateStatus.SCOUTING,
+            iteration_count=0,
+            user_intent=user_intent,
+            user_feedback_history=[],
+            scout_instructions=[],
+            raw_intelligence=[],
+            consolidated_briefing="",
+            technical_correction=None,
+            strategy_draft="",
+            audit_report="",
+            input_attachments=[]
+        )
+        
+        # Create and run just the intent analysis part of the graph
+        result_state = intent_analysis(state)
+        
+        # Convert ScoutInstruction objects to dictionaries
+        scout_instructions_dicts = []
+        for instruction in result_state.scout_instructions:
+            scout_instructions_dicts.append({
+                "id": instruction.id,
+                "role": instruction.role,
+                "topic": instruction.topic,
+                "status": instruction.status
+            })
+        
+        result_json = json.dumps(scout_instructions_dicts, ensure_ascii=False, indent=2)
+        result_text = f"## 侦察指令\n\n```json\n{result_json}\n```"
+        
+    except Exception as e:
+        print(f"Analyze intent error: {str(e)}")
+        result_text = f"分析意图时出现错误: {str(e)}"
+        
+    return [TextContent(type="text", text=result_text)]
+
+
+def search_market_impl(topic: str) -> list[TextContent]:
+    """执行市场情报搜索"""
+    try:
+        from cpsp_protocol.tools.web_search import web_search
+        
+        # Perform web search for market intelligence
+        search_results = web_search(topic, num_results=5)
+        
+        # Format results
+        formatted_results = []
+        for result in search_results:
+            formatted_results.append({
+                "title": result.get("title", ""),
+                "link": result.get("link", ""),
+                "snippet": result.get("snippet", "")
+            })
+        
+        result_json = json.dumps(formatted_results, ensure_ascii=False, indent=2)
+        result_text = f"## 市场搜索结果\n\n```json\n{result_json}\n```"
+        
+    except Exception as e:
+        print(f"Market search error: {str(e)}")
+        result_text = f"市场搜索时出现错误: {str(e)}"
+        
+    return [TextContent(type="text", text=result_text)]
+
+
+def search_competitor_impl(topic: str) -> list[TextContent]:
+    """执行竞争对手分析搜索"""
+    try:
+        from cpsp_protocol.tools.web_search import web_search
+        
+        # Perform web search for competitor analysis
+        search_results = web_search(topic, num_results=5)
+        
+        # Format results
+        formatted_results = []
+        for result in search_results:
+            formatted_results.append({
+                "title": result.get("title", ""),
+                "link": result.get("link", ""),
+                "snippet": result.get("snippet", "")
+            })
+        
+        result_json = json.dumps(formatted_results, ensure_ascii=False, indent=2)
+        result_text = f"## 竞争对手搜索结果\n\n```json\n{result_json}\n```"
+        
+    except Exception as e:
+        print(f"Competitor search error: {str(e)}")
+        result_text = f"竞争对手搜索时出现错误: {str(e)}"
+        
+    return [TextContent(type="text", text=result_text)]
+
+
+def generate_strategy_impl(intelligence_briefing: str) -> list[TextContent]:
+    """基于情报简报生成战略草案"""
+    try:
+        from cpsp_protocol.nodes.cpso import strategy_generation
+        from cpsp_protocol.state.schema import GlobalState, GlobalStateStatus
+        import uuid
+        
+        # Initialize the state with consolidated briefing
+        state = GlobalState(
+            request_id=str(uuid.uuid4()),
+            status=GlobalStateStatus.DRAFTING,
+            iteration_count=0,
+            user_intent="",
+            user_feedback_history=[],
+            scout_instructions=[],
+            raw_intelligence=[],
+            consolidated_briefing=intelligence_briefing,
+            technical_correction=None,
+            strategy_draft="",
+            audit_report="",
+            input_attachments=[]
+        )
+        
+        # Create and run just the strategy generation part of the graph
+        result_state = strategy_generation(state)
+        
+        result_text = f"## 战略草案\n\n{result_state.strategy_draft}"
+        
+    except Exception as e:
+        print(f"Strategy generation error: {str(e)}")
+        result_text = f"生成战略时出现错误: {str(e)}"
+        
+    return [TextContent(type="text", text=result_text)]
+
+
+def audit_strategy_impl(strategy_draft: str, intelligence_briefing: str) -> list[TextContent]:
+    """审计战略文档"""
+    try:
+        from cpsp_protocol.nodes.auditor import adversarial_audit
+        from cpsp_protocol.state.schema import GlobalState, GlobalStateStatus
+        import uuid
+        
+        # Initialize the state with strategy draft and consolidated briefing
+        state = GlobalState(
+            request_id=str(uuid.uuid4()),
+            status=GlobalStateStatus.AUDITING,
+            iteration_count=0,
+            user_intent="",
+            user_feedback_history=[],
+            scout_instructions=[],
+            raw_intelligence=[],
+            consolidated_briefing=intelligence_briefing,
+            technical_correction=None,
+            strategy_draft=strategy_draft,
+            audit_report="",
+            input_attachments=[]
+        )
+        
+        # Create and run just the audit part of the graph
+        result_state = adversarial_audit(state)
+        
+        result_text = f"## 审计报告\n\n{result_state.audit_report}"
+        
+    except Exception as e:
+        print(f"Strategy audit error: {str(e)}")
+        result_text = f"审计战略时出现错误: {str(e)}"
+        
+    return [TextContent(type="text", text=result_text)]
+
+
 # 初始化 MCP Server
 server = Server("cpso-mcp-server")
 
@@ -106,6 +277,80 @@ async def list_tools() -> list[Tool]:
                 "required": ["user_intent"],
             },
         ),
+        Tool(
+            name="analyze_intent",
+            description="分析用户战略意图并生成侦察指令",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_intent": {
+                        "type": "string",
+                        "description": "用户的战略需求或业务问题描述"
+                    }
+                },
+                "required": ["user_intent"],
+            },
+        ),
+        Tool(
+            name="search_market",
+            description="执行市场情报搜索",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "要搜索的市场主题"
+                    }
+                },
+                "required": ["topic"],
+            },
+        ),
+        Tool(
+            name="search_competitor",
+            description="执行竞争对手分析搜索",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "description": "要搜索的竞争对手主题"
+                    }
+                },
+                "required": ["topic"],
+            },
+        ),
+        Tool(
+            name="generate_strategy",
+            description="基于情报简报生成战略草案",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "intelligence_briefing": {
+                        "type": "string",
+                        "description": "用于生成战略的情报简报"
+                    }
+                },
+                "required": ["intelligence_briefing"],
+            },
+        ),
+        Tool(
+            name="audit_strategy",
+            description="审计战略文档",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "strategy_draft": {
+                        "type": "string",
+                        "description": "要审计的战略草案"
+                    },
+                    "intelligence_briefing": {
+                        "type": "string",
+                        "description": "战略基于的情报简报"
+                    }
+                },
+                "required": ["strategy_draft", "intelligence_briefing"],
+            },
+        ),
     ]
 
 
@@ -117,6 +362,34 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if not user_intent:
             raise ValueError("缺少 user_intent 参数")
         return execute_strategy_impl(user_intent)
+    elif name == "analyze_intent":
+        user_intent = arguments.get("user_intent")
+        if not user_intent:
+            raise ValueError("缺少 user_intent 参数")
+        return analyze_intent_impl(user_intent)
+    elif name == "search_market":
+        topic = arguments.get("topic")
+        if not topic:
+            raise ValueError("缺少 topic 参数")
+        return search_market_impl(topic)
+    elif name == "search_competitor":
+        topic = arguments.get("topic")
+        if not topic:
+            raise ValueError("缺少 topic 参数")
+        return search_competitor_impl(topic)
+    elif name == "generate_strategy":
+        intelligence_briefing = arguments.get("intelligence_briefing")
+        if not intelligence_briefing:
+            raise ValueError("缺少 intelligence_briefing 参数")
+        return generate_strategy_impl(intelligence_briefing)
+    elif name == "audit_strategy":
+        strategy_draft = arguments.get("strategy_draft")
+        intelligence_briefing = arguments.get("intelligence_briefing")
+        if not strategy_draft:
+            raise ValueError("缺少 strategy_draft 参数")
+        if not intelligence_briefing:
+            raise ValueError("缺少 intelligence_briefing 参数")
+        return audit_strategy_impl(strategy_draft, intelligence_briefing)
     raise ValueError(f"未知的工具: {name}")
 
 
