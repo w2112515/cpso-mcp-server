@@ -488,7 +488,7 @@ app = Starlette(
     routes=[
         Route("/", endpoint=homepage),
         Route("/health", endpoint=health_check),
-        Mount("/sse", app=SSEEndpoint()),  # 使用 Mount 而非 Route，直接传递 ASGI
+        Route("/sse", endpoint=SSEEndpoint()),  # 使用 Route，SSEEndpoint 实现了 __call__
         Mount("/messages/", app=sse.handle_post_message),
     ],
     middleware=[
