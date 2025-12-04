@@ -49,8 +49,10 @@ def check_api_keys():
 API_KEYS_CONFIGURED = check_api_keys()
 
 
+logger.info("🚀 CPSO MCP Server 启动中...")
+
 def execute_strategy_impl(user_intent: str) -> list[TextContent]:
-    """执行战略规划"""
+    """执行战略规划 (延迟导入以加快启动)"""
     # 首先检查 API Key 是否配置
     if not API_KEYS_CONFIGURED:
         error_text = """## ❌ 配置错误
