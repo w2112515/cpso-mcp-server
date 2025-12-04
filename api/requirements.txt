@@ -6,6 +6,7 @@ mcp>=1.0.0
 # Web 框架
 starlette>=0.27.0
 uvicorn[standard]>=0.20.0
+sse-starlette>=1.6.0
 
 # 核心依赖
 pydantic>=2.0.0
