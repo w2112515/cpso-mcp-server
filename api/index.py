@@ -439,21 +439,22 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 sse = SseServerTransport("/messages/")
 
 
-async def handle_sse(request):
-    """处理 SSE 连接 - 按照官方示例实现"""
-    from starlette.responses import Response
+class SSEApp:
+    """原生 ASGI 应用处理 SSE 连接"""
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return
 
-    async with sse.connect_sse(
-        request.scope,
-        request.receive,
-        request._send
-    ) as streams:
-        await server.run(
-            streams[0],
-            streams[1],
-            server.create_initialization_options()
-        )
-    return Response()
+        async with sse.connect_sse(scope, receive, send) as streams:
+            await server.run(
+                streams[0],
+                streams[1],
+                server.create_initialization_options()
+            )
+
+
+# SSE ASGI 应用实例
+sse_app = SSEApp()
 
 
 async def health_check(request):
@@ -491,7 +492,7 @@ app = Starlette(
     routes=[
         Route("/", endpoint=homepage),
         Route("/health", endpoint=health_check),
-        Route("/sse", endpoint=handle_sse, methods=["GET"]),  # SSE 端点
+        Mount("/sse", app=sse_app),  # 使用 Mount 挂载 ASGI 应用
         Mount("/messages/", app=sse.handle_post_message),
     ],
     middleware=[
